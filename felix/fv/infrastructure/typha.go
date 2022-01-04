@@ -25,6 +25,7 @@ import (
 
 	"github.com/projectcalico/calico/typha/pkg/tlsutils"
 
+	"github.com/projectcalico/calico/felix/fv/connectivity"
 	"github.com/projectcalico/calico/felix/fv/containers"
 	"github.com/projectcalico/calico/felix/fv/utils"
 )
@@ -39,6 +40,15 @@ func (f *Typha) GetTyphaPID() int {
 
 func (f *Typha) GetTyphaPIDs() []int {
 	return f.GetPIDs("calico-typha")
+}
+
+func (f *Typha) ToMatcher(explicitPort ...uint16) *connectivity.Matcher {
+	return &connectivity.Matcher{
+		IP:         f.IP,
+		Port:       "5473",
+		TargetName: f.Name,
+		Protocol:   "tcp",
+	}
 }
 
 func RunTypha(infra DatastoreInfra, options TopologyOptions) *Typha {

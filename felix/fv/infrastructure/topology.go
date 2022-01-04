@@ -134,7 +134,7 @@ func StartNNodeEtcdTopology(n int, opts TopologyOptions) (felixes []*Felix, etcd
 	etcd = eds.etcdContainer
 	infra = eds
 
-	felixes, client = StartNNodeTopology(n, opts, eds)
+	felixes, _, client = StartNNodeTopology(n, opts, eds)
 
 	return
 }
@@ -142,7 +142,7 @@ func StartNNodeEtcdTopology(n int, opts TopologyOptions) (felixes []*Felix, etcd
 // StartSingleNodeEtcdTopology starts an etcd container and a single Felix container; it initialises
 // the datastore and installs a Node resource for the Felix node.
 func StartSingleNodeTopology(options TopologyOptions, infra DatastoreInfra) (felix *Felix, calicoClient client.Interface) {
-	felixes, calicoClient := StartNNodeTopology(1, options, infra)
+	felixes, _, calicoClient := StartNNodeTopology(1, options, infra)
 	felix = felixes[0]
 	return
 }
@@ -155,7 +155,7 @@ func StartSingleNodeTopology(options TopologyOptions, infra DatastoreInfra) (fel
 // - Configures routes between the hosts, giving each host 10.65.x.0/24, where x is the
 //   index in the returned array.  When creating workloads, use IPs from the relevant block.
 // - Configures the Tunnel IP for each host as 10.65.x.1.
-func StartNNodeTopology(n int, opts TopologyOptions, infra DatastoreInfra) (felixes []*Felix, client client.Interface) {
+func StartNNodeTopology(n int, opts TopologyOptions, infra DatastoreInfra) (felixes []*Felix, typha *Typha, client client.Interface) {
 	log.Infof("Starting a %d-node topology.", n)
 	success := false
 	var err error
@@ -210,10 +210,11 @@ func StartNNodeTopology(n int, opts TopologyOptions, infra DatastoreInfra) (feli
 
 	typhaIP := ""
 	if opts.WithTypha {
-		typha := RunTypha(infra, opts)
+		typha = RunTypha(infra, opts)
 		opts.ExtraEnvVars["FELIX_TYPHAADDR"] = typha.IP + ":5473"
 		typhaIP = typha.IP
 	}
+
 
 	felixes = make([]*Felix, n)
 	var wg sync.WaitGroup
@@ -350,6 +351,7 @@ func StartNNodeTopology(n int, opts TopologyOptions, infra DatastoreInfra) (feli
 			}(i, j, iFelix, jFelix)
 		}
 	}
+
 	wg.Wait()
 	success = true
 	return

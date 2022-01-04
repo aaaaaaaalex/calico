@@ -47,7 +47,7 @@ type Felix struct {
 	// IP of the Typha that this Felix is using (if any).
 	TyphaIP string
 
-	// If sets, acts like an external IP of a node. Filled in by AddNode().
+	// If set, acts like an external IP of a node. Filled in by AddNode().
 	// XXX setup routes
 	ExternalIP string
 

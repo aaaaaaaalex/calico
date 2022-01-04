@@ -101,7 +101,7 @@ var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ WireGuard-Supported", []api
 		log.Info("Started dmesg log capture")
 
 		infra = getInfra()
-		topologyOptions := wireguardTopologyOptions("CalicoIPAM", true)
+		topologyOptions := wireguardTopologyOptions("CalicoIPAM", true, false)
 		felixes, client = infrastructure.StartNNodeTopology(nodeCount, topologyOptions, infra)
 
 		// To allow all ingress and egress, in absence of any Policy.
@@ -645,7 +645,7 @@ var _ = infrastructure.DatastoreDescribe("WireGuard-Unsupported", []apiconfig.Da
 		const nodeCount = 1
 
 		infra = getInfra()
-		felixes, _ = infrastructure.StartNNodeTopology(nodeCount, wireguardTopologyOptions("CalicoIPAM", true), infra)
+		felixes, _ = infrastructure.StartNNodeTopology(nodeCount, wireguardTopologyOptions("CalicoIPAM", true, false), infra)
 
 		// Install a default profile that allows all ingress and egress, in the absence of any Policy.
 		infra.AddDefaultAllow()
@@ -684,7 +684,7 @@ var _ = infrastructure.DatastoreDescribe("WireGuard-Unsupported", []apiconfig.Da
 	})
 })
 
-var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ WireGuard-Supported 3 node cluster", []apiconfig.DatastoreType{apiconfig.EtcdV3, apiconfig.Kubernetes}, func(getInfra infrastructure.InfraFactory) {
+var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ WireGuard-Supported 3-node cluster", []apiconfig.DatastoreType{apiconfig.EtcdV3, apiconfig.Kubernetes}, func(getInfra infrastructure.InfraFactory) {
 	const nodeCount = 3
 
 	var (
@@ -706,7 +706,7 @@ var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ WireGuard-Supported 3 node 
 		}
 
 		infra = getInfra()
-		topologyOptions := wireguardTopologyOptions("CalicoIPAM", true)
+		topologyOptions := wireguardTopologyOptions("CalicoIPAM", true, false)
 		felixes, client = infrastructure.StartNNodeTopology(nodeCount, topologyOptions, infra)
 
 		// To allow all ingress and egress, in absence of any Policy.
@@ -973,7 +973,7 @@ var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ WireGuard-Supported 3-node 
 		}
 
 		infra = getInfra()
-		topologyOptions := wireguardTopologyOptions("WorkloadIPs", false)
+		topologyOptions := wireguardTopologyOptions("WorkloadIPs", false, false)
 		felixes, client = infrastructure.StartNNodeTopology(nodeCount, topologyOptions, infra)
 
 		// To allow all ingress and egress, in absence of any Policy.
@@ -1248,9 +1248,131 @@ var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ WireGuard-Supported 3-node 
 	})
 })
 
+var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ WireGuard-Supported 3-node cluster with Typha", []apiconfig.DatastoreType{apiconfig.EtcdV3, apiconfig.Kubernetes}, func(getInfra infrastructure.InfraFactory) {
+	const nodeCount = 3
+
+	var (
+		infra   infrastructure.DatastoreInfra
+		felixes []*infrastructure.Felix
+		typha   *infrastructure.Typha
+		client  clientv3.Interface
+
+		wls      [nodeCount]*workload.Workload // simulated host workloads
+		cc       *connectivity.Checker
+		tcpdumps []*tcpdump.TCPDump
+	)
+
+	BeforeEach(func() {
+		//Skip("Skipping WireGuard tests for now due to unreliability.")
+
+		// Run these tests only when the Host has Wireguard kernel module available.
+		if os.Getenv("FELIX_FV_WIREGUARD_AVAILABLE") != "true" {
+			Skip("Skipping Wireguard supported tests.")
+		}
+
+		infra = getInfra()
+		topologyOptions := wireguardTopologyOptions("CalicoIPAM", true, true)
+		felixes, typha, client = infrastructure.StartNNodeTopology(nodeCount, topologyOptions, infra)
+
+		// To allow all ingress and egress, in absence of any Policy.
+		infra.AddDefaultAllow()
+
+		for i := range wls {
+			wls[i] = createWorkloadWithAssignedIP(
+				&infra,
+				&topologyOptions,
+				&client,
+				fmt.Sprintf("10.65.%d.2", i),
+				fmt.Sprintf("wl%d", i),
+				felixes[i])
+		}
+
+		// Create 'borrowed' workloads e.g. create workload on felix-0 with IP
+		// borrowed from IPAM block from felix-1.
+		_ = createWorkloadWithAssignedIP(
+			&infra,
+			&topologyOptions,
+			&client,
+			"10.65.0.4",
+			"borrowed-0",
+			felixes[1])
+		_ = createWorkloadWithAssignedIP(
+			&infra,
+			&topologyOptions,
+			&client,
+			"10.65.1.4",
+			"borrowed-1",
+			felixes[0])
+
+		for i := range felixes {
+			felixes[i].TriggerDelayedStart()
+		}
+
+		cc = &connectivity.Checker{}
+	})
+
+	AfterEach(func() {
+		if CurrentGinkgoTestDescription().Failed {
+			for _, felix := range felixes {
+				felix.Exec("ip", "addr")
+				felix.Exec("ip", "rule", "list")
+				felix.Exec("ip", "route", "show", "table", "all")
+				felix.Exec("ip", "route", "show", "cached")
+				felix.Exec("wg")
+			}
+		}
+
+		for _, wl := range wls {
+			wl.Stop()
+		}
+
+		for _, tcpdump := range tcpdumps {
+			tcpdump.Stop()
+		}
+
+		for _, felix := range felixes {
+			felix.Stop()
+		}
+
+		if CurrentGinkgoTestDescription().Failed {
+			infra.DumpErrorData()
+		}
+		infra.Stop()
+	})
+
+	Context("with WireGuard host-encryption enabled", func() {
+		BeforeEach(func() {
+			enableHostEncryption(client)
+		})
+
+		AfterEach(func() {
+			disableHostEncryption(client)
+		})
+
+		It("should bootstrap Typha connectivity after losing WireGuard dataplane config", func() {
+			cc.ExpectSome(felixes[0], typha)
+			cc.CheckConnectivity()
+
+			// reboot felix and wipe wireguard config
+
+			// check connectivity to Typha again.
+		})
+
+		It("should bootstrap Typha connectivity when store and dataplane WireGuard configs mismatch", func() {
+			// check typha conn
+
+			// restart felix
+
+			// change datastore pubKey
+
+			// check typha conn
+		})
+	})
+})
+
 // Setup cluster topology options.
 // mainly, enable Wireguard with delayed start option.
-func wireguardTopologyOptions(routeSource string, ipipEnabled bool) infrastructure.TopologyOptions {
+func wireguardTopologyOptions(routeSource string, ipipEnabled bool, typhaEnabled bool) infrastructure.TopologyOptions {
 	topologyOptions := infrastructure.DefaultTopologyOptions()
 
 	// Waiting for calico-node to be ready.
@@ -1265,6 +1387,8 @@ func wireguardTopologyOptions(routeSource string, ipipEnabled bool) infrastructu
 	if routeSource == "WorkloadIPs" {
 		topologyOptions.UseIPPools = false
 	}
+	// Enable Typha on the cluster
+	topologyOptions.WithTypha = typhaEnabled
 	topologyOptions.ExtraEnvVars["FELIX_ROUTESOURCE"] = routeSource
 	topologyOptions.ExtraEnvVars["FELIX_PROMETHEUSMETRICSENABLED"] = "true"
 	topologyOptions.IPIPEnabled = ipipEnabled
@@ -1300,6 +1424,24 @@ func updateWireguardEnabledConfig(client clientv3.Interface, value bool) {
 	felixConfig, err := client.FelixConfigurations().Get(ctx, "default", options.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 	felixConfig.Spec.WireguardEnabled = &value
+	felixConfig, err = client.FelixConfigurations().Update(ctx, felixConfig, options.SetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func enableHostEncryption(client clientv3.Interface) {
+	updateWireguardHostEncryptionConfig(client, true)
+}
+
+func disableHostEncryption(client clientv3.Interface) {
+	updateWireguardHostEncryptionConfig(client, false)
+}
+
+func updateWireguardHostEncryptionConfig(client clientv3.Interface, value bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	felixConfig, err := client.FelixConfigurations().Get(ctx, "default", options.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+	felixConfig.Spec.WireguardHostEncryptionEnabled = &value
 	felixConfig, err = client.FelixConfigurations().Update(ctx, felixConfig, options.SetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 }
