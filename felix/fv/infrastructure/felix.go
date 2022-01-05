@@ -196,6 +196,17 @@ func (f *Felix) Stop() {
 }
 
 func (f *Felix) Restart() {
+	f.restart(false)
+}
+
+func (f *Felix) RestartWithDelay() {
+	f.restart(true)
+}
+
+func (f *Felix) restart(withDelay bool) {
+	if withDelay {
+		f.Exec("rm", "/start-trigger")
+	}
 	oldPID := f.GetFelixPID()
 	f.Exec("kill", "-HUP", fmt.Sprint(oldPID))
 	Eventually(f.GetFelixPID, "10s", "100ms").ShouldNot(Equal(oldPID))
