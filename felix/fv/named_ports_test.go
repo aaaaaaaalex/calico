@@ -869,7 +869,7 @@ func describeNamedPortHostEndpointTests(getInfra infrastructure.InfraFactory, na
 	BeforeEach(func() {
 		infra = getInfra()
 
-		felixes, client = infrastructure.StartNNodeTopology(2, infrastructure.DefaultTopologyOptions(), infra)
+		felixes, _, client = infrastructure.StartNNodeTopology(2, infrastructure.DefaultTopologyOptions(), infra)
 
 		err := infra.AddAllowToDatastore("host-endpoint=='true'")
 		Expect(err).NotTo(HaveOccurred())

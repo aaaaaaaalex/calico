@@ -352,7 +352,7 @@ func describeBPFTests(opts ...bpfTestOpt) bool {
 			}
 
 			JustBeforeEach(func() {
-				felixes, calicoClient = infrastructure.StartNNodeTopology(1, options, infra)
+				felixes, _, calicoClient = infrastructure.StartNNodeTopology(1, options, infra)
 
 				hostW = workload.Run(
 					felixes[0],
@@ -665,7 +665,7 @@ func describeBPFTests(opts ...bpfTestOpt) bool {
 		)
 
 		setupCluster := func() {
-			felixes, calicoClient = infrastructure.StartNNodeTopology(numNodes, options, infra)
+			felixes, _, calicoClient = infrastructure.StartNNodeTopology(numNodes, options, infra)
 
 			addWorkload := func(run bool, ii, wi, port int, labels map[string]string) *workload.Workload {
 				if labels == nil {

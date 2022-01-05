@@ -67,7 +67,7 @@ func describeHostEndpointTests(getInfra infrastructure.InfraFactory, allInterfac
 		options := infrastructure.DefaultTopologyOptions()
 		options.IPIPEnabled = false
 		options.WithTypha = true
-		felixes, client = infrastructure.StartNNodeTopology(2, options, infra)
+		felixes, _, client = infrastructure.StartNNodeTopology(2, options, infra)
 
 		// Create workloads, using that profile. One on each "host".
 		for ii := range w {

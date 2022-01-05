@@ -42,7 +42,7 @@ var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ Felix bpf reattach object",
 			},
 		}
 
-		felixes, _ = infrastructure.StartNNodeTopology(1, opts, infra)
+		felixes, _, _ = infrastructure.StartNNodeTopology(1, opts, infra)
 
 		err := infra.AddAllowToDatastore("host-endpoint=='true'")
 		Expect(err).NotTo(HaveOccurred())

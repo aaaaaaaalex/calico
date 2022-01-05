@@ -102,7 +102,7 @@ var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ WireGuard-Supported", []api
 
 		infra = getInfra()
 		topologyOptions := wireguardTopologyOptions("CalicoIPAM", true, false)
-		felixes, client = infrastructure.StartNNodeTopology(nodeCount, topologyOptions, infra)
+		felixes, _, client = infrastructure.StartNNodeTopology(nodeCount, topologyOptions, infra)
 
 		// To allow all ingress and egress, in absence of any Policy.
 		infra.AddDefaultAllow()
@@ -645,7 +645,7 @@ var _ = infrastructure.DatastoreDescribe("WireGuard-Unsupported", []apiconfig.Da
 		const nodeCount = 1
 
 		infra = getInfra()
-		felixes, _ = infrastructure.StartNNodeTopology(nodeCount, wireguardTopologyOptions("CalicoIPAM", true, false), infra)
+		felixes, _, _ = infrastructure.StartNNodeTopology(nodeCount, wireguardTopologyOptions("CalicoIPAM", true, false), infra)
 
 		// Install a default profile that allows all ingress and egress, in the absence of any Policy.
 		infra.AddDefaultAllow()
@@ -707,7 +707,7 @@ var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ WireGuard-Supported 3-node 
 
 		infra = getInfra()
 		topologyOptions := wireguardTopologyOptions("CalicoIPAM", true, false)
-		felixes, client = infrastructure.StartNNodeTopology(nodeCount, topologyOptions, infra)
+		felixes, _, client = infrastructure.StartNNodeTopology(nodeCount, topologyOptions, infra)
 
 		// To allow all ingress and egress, in absence of any Policy.
 		infra.AddDefaultAllow()
@@ -974,7 +974,7 @@ var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ WireGuard-Supported 3-node 
 
 		infra = getInfra()
 		topologyOptions := wireguardTopologyOptions("WorkloadIPs", false, false)
-		felixes, client = infrastructure.StartNNodeTopology(nodeCount, topologyOptions, infra)
+		felixes, _, client = infrastructure.StartNNodeTopology(nodeCount, topologyOptions, infra)
 
 		// To allow all ingress and egress, in absence of any Policy.
 		infra.AddDefaultAllow()
@@ -1359,6 +1359,8 @@ var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ WireGuard-Supported 3-node 
 		})
 
 		It("should bootstrap Typha connectivity when store and dataplane WireGuard configs mismatch", func() {
+			cc.ExpectSome(felixes[0], typha)
+			cc.CheckConnectivity()
 			// check typha conn
 
 			// restart felix

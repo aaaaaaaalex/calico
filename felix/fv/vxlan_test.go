@@ -74,7 +74,7 @@ var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ VXLAN topology before addin
 					// for these tests.  Since we're testing in containers anyway, checksum offload can't really be
 					// tested but we can verify the state with ethtool.
 					topologyOptions.ExtraEnvVars["FELIX_FeatureDetectOverride"] = fmt.Sprintf("ChecksumOffloadBroken=%t", brokenXSum)
-					felixes, client = infrastructure.StartNNodeTopology(3, topologyOptions, infra)
+					felixes, _, client = infrastructure.StartNNodeTopology(3, topologyOptions, infra)
 
 					// Install a default profile that allows all ingress and egress, in the absence of any Policy.
 					infra.AddDefaultAllow()

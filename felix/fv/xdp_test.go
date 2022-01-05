@@ -68,7 +68,7 @@ var _ = infrastructure.DatastoreDescribe("_BPF-SAFE_ XDP tests with initialized 
 			"FELIX_XDPREFRESHINTERVAL": "10",
 			"FELIX_LOGSEVERITYSCREEN":  "debug",
 		}
-		felixes, client = infrastructure.StartNNodeTopology(4, opts, infra)
+		felixes, _, client = infrastructure.StartNNodeTopology(4, opts, infra)
 
 		err := infra.AddAllowToDatastore("host-endpoint=='true'")
 		Expect(err).NotTo(HaveOccurred())
