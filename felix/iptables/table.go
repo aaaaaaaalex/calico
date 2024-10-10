@@ -489,14 +489,14 @@ func (t *Table) InsertOrAppendRules(chainName string, rules []generictables.Rule
 	t.logCxt.WithField("chainName", chainName).Debug("Updating rule insertions")
 	oldRules := t.chainToInsertedRules[chainName]
 	t.chainToInsertedRules[chainName] = rules
-	numRulesDelta := len(rules) - len(oldRules)
-	t.gaugeNumRules.Add(float64(numRulesDelta))
 	t.dirtyInsertAppend.Add(chainName)
 
 	// Incref any newly-referenced chains, then decref the old ones.  By incrementing first we
 	// avoid marking a still-referenced chain as dirty.
-	t.maybeIncrefReferredChains(chainName, rules)
+	increfs := t.maybeIncrefReferredChains(chainName, rules)
 	t.maybeDecrefReferredChains(chainName, oldRules)
+
+	t.gaugeNumRules.Add(float64(increfs))
 
 	// Defensive: updates to insert/append is very rare and the top-level
 	// chains are contended with other apps.  Make sure we re-read the state
@@ -512,14 +512,14 @@ func (t *Table) AppendRules(chainName string, rules []generictables.Rule) {
 	t.logCxt.WithField("chainName", chainName).Debug("Updating rule appends")
 	oldRules := t.chainToAppendedRules[chainName]
 	t.chainToAppendedRules[chainName] = rules
-	numRulesDelta := len(rules) - len(oldRules)
-	t.gaugeNumRules.Add(float64(numRulesDelta))
 	t.dirtyInsertAppend.Add(chainName)
 
 	// Incref any newly-referenced chains, then decref the old ones.  By incrementing first we
 	// avoid marking a still-referenced chain as dirty.
-	t.maybeIncrefReferredChains(chainName, rules)
+	increfs := t.maybeIncrefReferredChains(chainName, rules)
 	t.maybeDecrefReferredChains(chainName, oldRules)
+
+	t.gaugeNumRules.Add(float64(increfs))
 
 	// Defensive: updates to insert/append is very rare and the top-level
 	// chains are contended with other apps.  Make sure we re-read the state
@@ -535,18 +535,18 @@ func (t *Table) UpdateChains(chains []*generictables.Chain) {
 
 func (t *Table) UpdateChain(chain *generictables.Chain) {
 	t.logCxt.WithField("chainName", chain.Name).Debug("Adding chain to available set.")
-	oldNumRules := 0
 
 	// Incref any newly-referenced chains, then decref the old ones.  By incrementing first we
 	// avoid marking a still-referenced chain as dirty.
-	t.maybeIncrefReferredChains(chain.Name, chain.Rules)
+	var increfs, decrefs int
+	increfs = t.maybeIncrefReferredChains(chain.Name, chain.Rules)
 	if oldChain := t.chainNameToChain[chain.Name]; oldChain != nil {
-		oldNumRules = len(oldChain.Rules)
-		t.maybeDecrefReferredChains(chain.Name, oldChain.Rules)
+		decrefs = t.maybeDecrefReferredChains(chain.Name, oldChain.Rules)
 	}
+
+	t.gaugeNumRules.Add(float64(increfs))
+	t.gaugeNumRules.Sub(float64(decrefs))
 	t.chainNameToChain[chain.Name] = chain
-	numRulesDelta := len(chain.Rules) - oldNumRules
-	t.gaugeNumRules.Add(float64(numRulesDelta))
 	if t.chainIsReferenced(chain.Name) {
 		t.dirtyChains.Add(chain.Name)
 
@@ -567,8 +567,8 @@ func (t *Table) RemoveChains(chains []*generictables.Chain) {
 func (t *Table) RemoveChainByName(name string) {
 	t.logCxt.WithField("chainName", name).Debug("Removing chain from available set.")
 	if oldChain, known := t.chainNameToChain[name]; known {
-		t.gaugeNumRules.Sub(float64(len(oldChain.Rules)))
-		t.maybeDecrefReferredChains(name, oldChain.Rules)
+		decrefs := t.maybeDecrefReferredChains(name, oldChain.Rules)
+		t.gaugeNumRules.Sub(float64(decrefs))
 		delete(t.chainNameToChain, name)
 		if t.chainIsReferenced(name) {
 			t.dirtyChains.Add(name)
@@ -589,36 +589,40 @@ func (t *Table) chainIsReferenced(name string) bool {
 // maybeIncrefReferredChains checks whether the named chain is referenced;
 // if so, it increfs all child chains.  If a child chain becomes newly
 // referenced, its children are increffed recursively.
-func (t *Table) maybeIncrefReferredChains(chainName string, rules []generictables.Rule) {
+func (t *Table) maybeIncrefReferredChains(chainName string, rules []generictables.Rule) (numAffected int) {
 	if !t.chainIsReferenced(chainName) {
 		return
 	}
 	for _, r := range rules {
 		if ref, ok := r.Action.(Referrer); ok {
 			t.increfChain(ref.ReferencedChain())
+			numAffected++
 		}
 	}
+	return
 }
 
 // maybeDecrefReferredChains checks whether the named chain is referenced;
 // if so, it decrefs all child chains.  If a child chain becomes newly
 // unreferenced, its children are decreffed recursively.
-func (t *Table) maybeDecrefReferredChains(chainName string, rules []generictables.Rule) {
+func (t *Table) maybeDecrefReferredChains(chainName string, rules []generictables.Rule) (numDecrefs int) {
 	if !t.chainIsReferenced(chainName) {
 		return
 	}
 	for _, r := range rules {
 		if ref, ok := r.Action.(Referrer); ok {
 			t.decrefChain(ref.ReferencedChain())
+			numDecrefs++
 		}
 	}
+	return
 }
 
 // increfChain increments the refcount of the given chain; if the refcount transitions from 0,
 // marks the chain dirty so it will be programmed.
 func (t *Table) increfChain(chainName string) {
 	log.WithField("chainName", chainName).Debug("Incref chain")
-	t.chainRefCounts[chainName] += 1
+	t.chainRefCounts[chainName]++
 	if t.chainRefCounts[chainName] == 1 {
 		t.updateRateLimitedLog.WithField("chainName", chainName).Info("Chain became referenced, marking it for programming")
 		t.dirtyChains.Add(chainName)
