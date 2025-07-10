@@ -582,8 +582,8 @@ func bpftool(args ...string) ([]byte, error) {
 var (
 	mapInitOnce sync.Once
 
-	natMap, natBEMap, ctMap, ctCleanupMap, rtMap, ipsMap, testStateMap, affinityMap, arpMap, fsafeMap, ipfragsMap, maglevMap maps.Map
-	natMapV6, natBEMapV6, ctMapV6, ctCleanupMapV6, rtMapV6, ipsMapV6, affinityMapV6, arpMapV6, fsafeMapV6, maglevMapV6       maps.Map
+	natMap, natBEMap, ctMap, ctCleanupMap, rtMap, ipsMap, testStateMap, affinityMap, arpMap, fsafeMap, ipfragsMap, consistentHashMap maps.Map
+	natMapV6, natBEMapV6, ctMapV6, ctCleanupMapV6, rtMapV6, ipsMapV6, affinityMapV6, arpMapV6, fsafeMapV6, consistentHashMapV6       maps.Map
 	stateMap, countersMap, ifstateMap, progMap, progMapXDP, policyJumpMap, policyJumpMapXDP                                  maps.Map
 	perfMap                                                                                                                  maps.Map
 	profilingMap, ipfragsMapTmp                                                                                              maps.Map
@@ -619,14 +619,14 @@ func initMapsOnce() {
 		policyJumpMap = jump.Map()
 		policyJumpMapXDP = jump.XDPMap()
 		profilingMap = profiling.Map()
-		maglevMap = nat.MaglevMap()
-		maglevMapV6 = nat.MaglevMapV6()
+		consistentHashMap = nat.ConsistentHashMap()
+		consistentHashMapV6 = nat.ConsistentHashMapV6()
 
 		perfMap = perf.Map("perf_evnt", 512)
 
 		allMaps = []maps.Map{natMap, natBEMap, natMapV6, natBEMapV6, ctMap, ctMapV6, ctCleanupMap, ctCleanupMapV6, rtMap, rtMapV6, ipsMap, ipsMapV6,
 			stateMap, testStateMap, affinityMap, affinityMapV6, arpMap, arpMapV6, fsafeMap, fsafeMapV6,
-			countersMap, ipfragsMap, ipfragsMapTmp, ifstateMap, profilingMap, maglevMap, maglevMapV6,
+			countersMap, ipfragsMap, ipfragsMapTmp, ifstateMap, profilingMap, consistentHashMap, consistentHashMapV6,
 			policyJumpMap, policyJumpMapXDP}
 		for _, m := range allMaps {
 			err := m.EnsureExists()
@@ -1360,8 +1360,8 @@ func tcpResponseRaw(in []byte) []byte {
 	return out.Bytes()
 }
 
-func dumpMaglevMap(maglevMap maps.Map) {
-	m, err := nat.LoadMaglevMap(maglevMap)
+func dumpConsistentHashMap(chMap maps.Map) {
+	m, err := nat.LoadConsistentHashMap(chMap)
 	Expect(err).NotTo(HaveOccurred())
 	for k, v := range m {
 
