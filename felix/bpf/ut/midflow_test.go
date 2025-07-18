@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/projectcalico/calico/felix/bpf/nat"
+	tcdefs "github.com/projectcalico/calico/felix/bpf/tc/defs"
 )
 
 func TestMidflowFailoverNoConntrack(t *testing.T) {
@@ -75,6 +76,7 @@ func TestMidflowFailoverNoConntrack(t *testing.T) {
 		res, err := bpfrun(packetBytes)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(res.Retval).To(Equal(resTC_ACT_UNSPEC))
+		Expect(skbMark).To(BeEquivalentTo(tcdefs.MarkSeenFallThrough))
 	})
 
 	svcVal = nat.NewNATValueWithFlags(123, 1, 0, 0, nat.NATFlgNatConsistentHash)

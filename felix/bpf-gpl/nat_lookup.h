@@ -16,6 +16,26 @@
 
 #include "jhash.h"
 
+static CALI_BPF_INLINE bool calico_nat_check_ch(ipv46_addr_t *ip_src,
+		ipv46_addr_t *ip_dst, __u16 dport, __u8 ip_proto)
+{
+	struct calico_nat_key nat_key = {
+		.prefixlen = NAT_PREFIX_LEN_WITH_SRC_MATCH_IN_BITS,
+		.addr = *ip_dst,
+		.port = dport,
+		.protocol = ip_proto,
+		.saddr = *ip_src,
+	};
+	struct calico_nat_value *nat_val;
+
+	nat_val = cali_nat_fe_lookup_elem(&nat_key);
+	if (!nat_val) {
+		return false;
+	}
+
+	return nat_val->flags & NAT_FLG_NAT_CONSISTENTHASH;
+}
+
 static CALI_BPF_INLINE struct calico_nat_dest* calico_nat_lookup(ipv46_addr_t *ip_src,
 								 ipv46_addr_t *ip_dst,
 								 __u8 ip_proto,
@@ -178,6 +198,8 @@ static CALI_BPF_INLINE struct calico_nat_dest* calico_nat_lookup(ipv46_addr_t *i
 			CALI_DEBUG("CONSISTENTHASH: picked CH backend " IP_FMT ":%d", debug_ip(ch_val->addr), ch_val->port);
 			return ch_val;
 		}
+		// Shouldn't happen.
+		CALI_DEBUG("CONSISTENTHASH: backend lookup miss");
 	}
 
 	ipv46_addr_t dst = *ip_dst;
