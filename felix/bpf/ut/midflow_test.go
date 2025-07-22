@@ -79,7 +79,7 @@ func TestMidflowFailoverNoConntrack(t *testing.T) {
 		Expect(skbMark).To(BeEquivalentTo(tcdefs.MarkSeenFallThrough))
 	})
 
-	svcVal = nat.NewNATValueWithFlags(123, 1, 0, 0, nat.NATFlgNatConsistentHash)
+	svcVal = nat.NewNATValueWithFlags(123, 1, 0, 0, nat.NATFlgConsistentHash)
 	withLogLevelWarnDo(func() {
 		resetMap(natMap)
 		err = natMap.Update(svcKey.AsBytes(), svcVal.AsBytes())
@@ -93,7 +93,6 @@ func TestMidflowFailoverNoConntrack(t *testing.T) {
 		_, err := bpfrun(packetBytes)
 		Expect(err).NotTo(HaveOccurred())
 	})
-
 }
 
 func withLogLevelWarnDo(f func()) {

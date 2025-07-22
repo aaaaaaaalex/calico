@@ -373,10 +373,9 @@ static CALI_BPF_INLINE void calico_tc_process_ct_lookup(struct cali_tc_ctx *ctx)
 		goto deny;
 	}
 
-	bool dst_is_consistenthash = false;
 	if (ct_result_rc(ctx->state->ct_result.rc) == CALI_CT_MID_FLOW_MISS) {
 		if (CALI_F_TO_HOST) {
-			dst_is_consistenthash = calico_nat_check_ch(&ctx->state->ip_src,
+			bool dst_is_consistenthash = calico_nat_check_ch(&ctx->state->ip_src,
 				&ctx->state->ip_dst, ctx->state->dport, ctx->state->ip_proto);
 
 			if (!dst_is_consistenthash) {
